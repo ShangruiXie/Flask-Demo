@@ -6,8 +6,8 @@ import sys
 
 app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgres://syriii:123456@localhost:5432/db1'
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
-
 migrate = Migrate(app, db)
 
 class Todo(db.Model):
@@ -21,7 +21,20 @@ class Todo(db.Model):
 
 # db.create_all()
 
-@app.route('/todos/completed/<todo_id>', methods=['POST'])
+@app.route('/todos/<todo_id>', methods=['DELETE'])
+def delete_todo(todo_id):
+    try:
+        todo = Todo.query.get(todo_id)
+        db.session.delete(todo)
+        db.session.commit()
+    except:
+        db.session.rollback()
+        print(sys.exc_info())
+    finally:
+        db.session.close()
+    return jsonify({'success': True})
+
+@app.route('/todos/<todo_id>', methods=['PUT'])
 def set_completed_todo(todo_id):
     try:
         completed = request.get_json()['completed']
@@ -31,9 +44,11 @@ def set_completed_todo(todo_id):
         db.session.commit()
     except:
         db.session.rollback()
+        print(sys.exc_info())
     finally:
         db.session.close()
-    return redirect(url_for('index'))
+    # return redirect(url_for('index'), code=200)
+    return jsonify({'success': True})
 
 @app.route('/todos', methods=['POST'])
 def create_todo():
@@ -46,6 +61,8 @@ def create_todo():
         db.session.add(todo)
         db.session.commit()
         body['description'] = todo.description
+        body['id'] = todo.id
+        body['completed'] = todo.completed
     except:
         error = True
         db.session.rollback()
